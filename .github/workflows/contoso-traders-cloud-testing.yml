@@ -21,6 +21,7 @@ env:
   CARTS_ACA_NAME: contoso-traders-carts
   CARTS_ACR_REPOSITORY_NAME: contosotradersapicarts
   CARTS_INTERNAL_ACA_NAME: contoso-traders-intcarts
+  PRODUCTS_ACA_NAME: contoso-traders-products
   CDN_PROFILE_NAME: contoso-traders-cdn
   CHAOS_AKS_EXPERIMENT_NAME: contoso-traders-chaos-aks-experiment
   KV_NAME: contosotraderskv
@@ -234,163 +235,22 @@ jobs:
       #
       # section #3: deploy the products api
       #
-      - name: install helm
-        uses: Azure/setup-helm@v3
-        id: install-helm
-        with:
-          version: v3.9.0
       - name: docker build
         run: docker build src -f ./src/ContosoTraders.Api.Products/Dockerfile -t ${{ env.ACR_NAME }}${{ vars.SUFFIX }}.azurecr.io/${{ env.PRODUCTS_ACR_REPOSITORY_NAME }}:latest -t ${{ env.ACR_NAME }}${{ vars.SUFFIX }}.azurecr.io/${{ env.PRODUCTS_ACR_REPOSITORY_NAME }}:${{ github.sha }}
       - name: docker push (to acr)
         run: docker push --all-tags ${{ env.ACR_NAME }}${{ vars.SUFFIX }}.azurecr.io/${{ env.PRODUCTS_ACR_REPOSITORY_NAME }}
-      - name: setup kubectl
-        uses: azure/setup-kubectl@v3
-      - name: create kubernetes secret (acr password)
-        uses: Azure/k8s-create-secret@v4
-        with:
-          secret-name: ${{ env.AKS_SECRET_NAME_ACR_PASSWORD }}
-          container-registry-url: ${{ env.ACR_NAME }}${{ vars.SUFFIX }}.azurecr.io
-          container-registry-username: ${{ env.ACR_NAME }}${{ vars.SUFFIX }}
-          container-registry-password: ${{ steps.extract-acr-password.outputs.acrPassword }}
-      - name: get managedIdentityClientId
-        uses: azure/CLI@v1
-        id: get-managedIdentityClientId
-        with:
-          inlineScript: echo "managedIdentityClientId"="$(az identity show -g ${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} --name ${{ env.USER_ASSIGNED_MANAGED_IDENTITY_NAME }}${{ vars.SUFFIX }} --query "clientId" -o tsv)" >> $GITHUB_OUTPUT
-      - name: create kubernetes secret (kv endpoint)
-        uses: Azure/k8s-create-secret@v4
-        with:
-          secret-type: "generic"
-          secret-name: ${{ env.AKS_SECRET_NAME_KV_ENDPOINT }}
-          string-data: '{ "${{ env.AKS_SECRET_NAME_KV_ENDPOINT }}" : "https://${{ env.KV_NAME }}${{ vars.SUFFIX }}.vault.azure.net/" }'
-      - name: create kubernetes secret (managed identity client id)
-        uses: Azure/k8s-create-secret@v4
-        with:
-          secret-type: "generic"
-          secret-name: ${{ env.AKS_SECRET_NAME_MI_CLIENTID }}
-          string-data: '{ "${{ env.AKS_SECRET_NAME_MI_CLIENTID }}" : "${{ steps.get-managedIdentityClientId.outputs.managedIdentityClientId }}" }'
-      - name: substitute tokens in deployment manifest
-        uses: cschleiden/replace-tokens@v1.2
-        with:
-          tokenPrefix: "{"
-          tokenSuffix: "}"
-          files: ./src/ContosoTraders.Api.Products/Manifests/Deployment.yaml
-        env:
-          SUFFIX: ${{ vars.SUFFIX }}
-          AKS_REPLICAS: ${{ env.AKS_REPLICAS }}
-          AKS_CPU_LIMIT: ${{ env.AKS_CPU_LIMIT }}
-          AKS_MEMORY_LIMIT: ${{ env.AKS_MEMORY_LIMIT }}
-      - name: lint deployment manifest
-        uses: azure/k8s-lint@v2.0
-        with:
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/Deployment.yaml
-      - name: apply deployment manifest
-        uses: Azure/k8s-deploy@v4
-        with:
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/Deployment.yaml
-          images: ${{ env.ACR_NAME }}${{ vars.SUFFIX }}.azurecr.io/${{ env.PRODUCTS_ACR_REPOSITORY_NAME }}:${{ github.sha }}
-          imagepullsecrets: ${{ env.AKS_SECRET_NAME_ACR_PASSWORD }}
-          force: true
-      - name: apply service manifest
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/Service.yaml
-          force: true
-      # setup chaos mesh
-      - name: apply namespace manifest (chaos-testing)
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/NamespaceChaosTesting.yaml
-          force: true
-      - name: setup chaos mesh
-        run: |
-          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} --name ${{ env.AKS_CLUSTER_NAME }}${{ vars.SUFFIX }}
-          ${{ steps.install-helm.outputs.helm-path }} repo add chaos-mesh https://charts.chaos-mesh.org
-          ${{ steps.install-helm.outputs.helm-path }} repo update
-          ${{ steps.install-helm.outputs.helm-path }} upgrade --install chaos-mesh chaos-mesh/chaos-mesh --namespace=chaos-testing --set chaosDaemon.runtime=containerd --set chaosDaemon.socketPath=/run/containerd/containerd.sock
-      # create the ingress controller
-      - name: create ingress controller
-        run: |
-          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} --name ${{ env.AKS_CLUSTER_NAME }}${{ vars.SUFFIX }}
-          ${{ steps.install-helm.outputs.helm-path }} repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-          ${{ steps.install-helm.outputs.helm-path }} repo update
-          ${{ steps.install-helm.outputs.helm-path }} upgrade --install --wait --timeout=1h nginx-ingress ingress-nginx/ingress-nginx \
-            --set controller.replicaCount=1 \
-            --set controller.nodeSelector."kubernetes\.io/os"=linux \
-            --set defaultBackend.nodeSelector."kubernetes\.io/os"=linux \
-            --set controller.admissionWebhooks.patch.nodeSelector."kubernetes\.io/os"=linux \
-            --set controller.service.externalTrafficPolicy=Local
-      - name: set dns label on public ip
+      - name: deploy to aca
         uses: azure/CLI@v1
         with:
-          inlineScript: az network public-ip update --dns-name ${{ env.AKS_DNS_LABEL }}${{ vars.SUFFIX }} -g ${{ env.AKS_NODES_RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} -n $(az network public-ip list --query "[?starts_with(name,'kubernetes-') ].name" -o tsv -g ${{ env.AKS_NODES_RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }})
-      # hack: extract the full fqdn / dns label of the aks app's public IP address
-      - name: get aks-fqdn
-        uses: azure/CLI@v1
-        id: get-aks-fqdn
-        with:
-          # note: There should be a whitespace between ')' and ']'. More details: https://stackoverflow.com/a/59154958
-          inlineScript: echo "aksFqdn"="$(az network public-ip list --query "[?starts_with(name,'kubernetes-') ].dnsSettings.fqdn" -o tsv -g ${{ env.AKS_NODES_RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }})" >> $GITHUB_OUTPUT
-      # install cert-manager
-      - name: apply namespace manifest (cert-manager)
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/NamespaceCertManager.yaml
-          force: true
-      - name: install cert-manager
-        run: |
-          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} --name ${{ env.AKS_CLUSTER_NAME }}${{ vars.SUFFIX }}
-          kubectl apply --validate=false -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.yaml
-      - name: sleep for 30 seconds
-        run: sleep 30s
-        shell: bash
-      - name: apply clusterIssuer manifest
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/ClusterIssuer.yaml
-          force: true
-      - name: substitute tokens in certificate manifest
-        uses: cschleiden/replace-tokens@v1.2
-        with:
-          tokenPrefix: "{"
-          tokenSuffix: "}"
-          files: ./src/ContosoTraders.Api.Products/Manifests/Certificate.yaml
-        env:
-          AKS_FQDN: ${{ steps.get-aks-fqdn.outputs.aksFqdn }}
-      - name: apply certificate manifest
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/Certificate.yaml
-          force: true
-      - name: substitute tokens in ingress manifest
-        uses: cschleiden/replace-tokens@v1.2
-        with:
-          tokenPrefix: "{"
-          tokenSuffix: "}"
-          files: ./src/ContosoTraders.Api.Products/Manifests/Ingress.yaml
-        env:
-          AKS_FQDN: ${{ steps.get-aks-fqdn.outputs.aksFqdn }}
-      - name: apply ingress manifest
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/Ingress.yaml
-          force: true
-      - name: apply clusterRole manifest
-        uses: Azure/k8s-deploy@v4
-        with:
-          pull-images: false
-          manifests: ./src/ContosoTraders.Api.Products/Manifests/ClusterRole.yaml
-          force: true
+          inlineScript: |
+            az config set extension.use_dynamic_install=yes_without_prompt
+            az containerapp update -n ${{ env.PRODUCTS_ACA_NAME }}${{ vars.SUFFIX }} -g ${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} --image ${{ env.ACR_NAME }}${{ vars.SUFFIX }}.azurecr.io/${{ env.PRODUCTS_ACR_REPOSITORY_NAME }}:${{ github.sha }}
       - name: set productsApiEndpoint in kv
         uses: azure/CLI@v1
         with:
-          inlineScript: az keyvault secret set --vault-name ${{ env.KV_NAME }}${{ vars.SUFFIX }} --name productsApiEndpoint --value ${{ steps.get-aks-fqdn.outputs.aksFqdn }} --description "endpoint url (fqdn) of the products api"
+          inlineScript: |
+            fqdn=$(az containerapp show -n ${{ env.PRODUCTS_ACA_NAME }}${{ vars.SUFFIX }} -g ${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }} --query "properties.configuration.ingress.fqdn" -o tsv)
+            az keyvault secret set --vault-name ${{ env.KV_NAME }}${{ vars.SUFFIX }} --name productsApiEndpoint --value $fqdn --description "endpoint url (fqdn) of the products api"
       - name: get products api endpoint
         uses: azure/CLI@v1
         id: get-productsApiEndpoint

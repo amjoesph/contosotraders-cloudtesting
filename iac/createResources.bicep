@@ -62,9 +62,11 @@ var cartsDbAcctName = '${prefixHyphenated}-carts${suffix}'
 var cartsDbName = 'cartsdb'
 var cartsDbStocksContainerName = 'carts'
 
-// app service plan (products api)
-var productsApiAppSvcPlanName = '${prefixHyphenated}-products${suffix}'
-var productsApiAppSvcName = '${prefixHyphenated}-products${suffix}'
+// azure container app (products api)
+var productsApiAcaName = '${prefixHyphenated}-products${suffix}'
+var productsApiAcaEnvName = '${prefix}productsacaenv${suffix}'
+var productsApiAcaSecretAcrPassword = 'acr-password'
+var productsApiAcaContainerDetailsName = '${prefixHyphenated}-products${suffix}'
 var productsApiSettingNameKeyVaultEndpoint = 'KeyVaultEndpoint'
 var productsApiSettingNameManagedIdentityClientId = 'ManagedIdentityClientId'
 
@@ -481,23 +483,22 @@ resource cartsdba 'Microsoft.DocumentDB/databaseAccounts@2022-08-15' = {
 // products api
 //
 
-// app service plan (linux)
-resource productsapiappsvcplan 'Microsoft.Web/serverfarms@2022-03-01' = {
-  name: productsApiAppSvcPlanName
+// aca environment (products api)
+resource productsapiacaenv 'Microsoft.App/managedEnvironments@2022-06-01-preview' = {
+  name: productsApiAcaEnvName
   location: resourceLocation
   tags: resourceTags
   sku: {
-    name: 'S1'
+    name: 'Consumption'
   }
   properties: {
-    reserved: true
+    zoneRedundant: false
   }
-  kind: 'linux'
 }
 
-// app service
-resource productsapiappsvc 'Microsoft.Web/sites@2022-03-01' = {
-  name: productsApiAppSvcName
+// aca (products api)
+resource productsapiaca 'Microsoft.App/containerApps@2022-06-01-preview' = {
+  name: productsApiAcaName
   location: resourceLocation
   tags: resourceTags
   identity: {
@@ -507,20 +508,70 @@ resource productsapiappsvc 'Microsoft.Web/sites@2022-03-01' = {
     }
   }
   properties: {
-    clientAffinityEnabled: false
-    httpsOnly: true
-    serverFarmId: productsapiappsvcplan.id
-    siteConfig: {
-      linuxFxVersion: 'DOTNETCORE|7.0'
-      alwaysOn: true
-      appSettings: [
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: true
+        allowInsecure: false
+        targetPort: 80
+        traffic: [
+          {
+            latestRevision: true
+            weight: 100
+          }
+        ]
+      }
+      registries: [
         {
-          name: productsApiSettingNameKeyVaultEndpoint
-          value: kv.properties.vaultUri
+          passwordSecretRef: productsApiAcaSecretAcrPassword
+          server: acr.properties.loginServer
+          username: acr.name
         }
+      ]
+      secrets: [
         {
-          name: productsApiSettingNameManagedIdentityClientId
-          value: userassignedmiforkvaccess.properties.clientId
+          name: productsApiAcaSecretAcrPassword
+          value: acr.listCredentials().passwords[0].value
+        }
+      ]
+    }
+    environmentId: productsapiacaenv.id
+    template: {
+      scale: {
+        minReplicas: 1
+        maxReplicas: 10
+        rules: [
+          {
+            name: 'http-scaling-rule'
+            http: {
+              metadata: {
+                concurrentRequests: '3'
+              }
+            }
+          }
+        ]
+      }
+      containers: [
+        {
+          env: [
+            {
+              name: productsApiSettingNameKeyVaultEndpoint
+              value: kv.properties.vaultUri
+            }
+            {
+              name: productsApiSettingNameManagedIdentityClientId
+              value: userassignedmiforkvaccess.properties.clientId
+            }
+          ]
+          // using a public image initially because no images have been pushed to our private ACR yet
+          // at this point. At a later point, our github workflow will update the ACA app to use the
+          // images from our private ACR.
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          name: productsApiAcaContainerDetailsName
+          resources: {
+            cpu: json('0.5')
+            memory: '1.0Gi'
+          }
         }
       ]
     }
@@ -1750,5 +1801,6 @@ resource chaosaksexperiment 'Microsoft.Chaos/experiments@2022-10-01-preview' = {
 // outputs
 ////////////////////////////////////////////////////////////////////////////////
 
+output productsApiEndpoint string = 'https://${productsapiaca.properties.configuration.ingress.fqdn}'
 output cartsApiEndpoint string = 'https://${cartsapiaca.properties.configuration.ingress.fqdn}'
 output uiCdnEndpoint string = 'https://${cdnprofile_ui2endpoint.properties.hostName}'
