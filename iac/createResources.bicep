@@ -980,257 +980,294 @@ resource imageclassifierstgacc 'Microsoft.Storage/storageAccounts@2023-01-01' = 
 // cdn
 //
 
-resource cdnprofile 'Microsoft.Cdn/profiles@2022-11-01-preview' = {
+resource cdnprofile 'Microsoft.Cdn/profiles@2021-06-01' = {
   name: cdnProfileName
   location: 'global'
   tags: resourceTags
   sku: {
-    name: 'Standard_Microsoft'
+    name: 'Standard_AzureFrontDoor'
   }
 }
 
-// endpoint (product images)
-resource cdnprofile_imagesendpoint 'Microsoft.Cdn/profiles/endpoints@2022-11-01-preview' = {
+// origin group (product images)
+resource cdnprofile_imagesorigingroup 'Microsoft.Cdn/profiles/originGroups@2021-06-01' = {
+  name: 'images-origin-group'
+  parent: cdnprofile
+  properties: {
+    loadBalancingSettings: {
+      sampleSize: 4
+      successfulSamplesRequired: 3
+    }
+    healthProbeSettings: {
+      probePath: '/'
+      probeRequestType: 'HEAD'
+      probeProtocol: 'Https'
+      probeIntervalInSeconds: 100
+    }
+  }
+}
+
+// origin (product images)
+resource cdnprofile_imagesorigin 'Microsoft.Cdn/profiles/originGroups/origins@2021-06-01' = {
+  name: 'images-origin'
+  parent: cdnprofile_imagesorigingroup
+  properties: {
+    hostName: replace(replace(productimagesstgacc.properties.primaryEndpoints.blob, 'https://', ''), '/', '')
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: replace(replace(productimagesstgacc.properties.primaryEndpoints.blob, 'https://', ''), '/', '')
+    priority: 1
+    weight: 1000
+  }
+}
+
+// afd endpoint (product images)
+resource cdnprofile_imagesendpoint 'Microsoft.Cdn/profiles/afdEndpoints@2021-06-01' = {
   name: cdnImagesEndpointName
   location: 'global'
-  tags: resourceTags
   parent: cdnprofile
   properties: {
-    isCompressionEnabled: true
-    contentTypesToCompress: [
-      'image/svg+xml'
-    ]
-    deliveryPolicy: {
-      rules: [
-        {
-          name: 'Global'
-          order: 0
-          actions: [
-            {
-              name: 'CacheExpiration'
-              parameters: {
-                typeName: 'DeliveryRuleCacheExpirationActionParameters'
-                cacheBehavior: 'SetIfMissing'
-                cacheType: 'All'
-                cacheDuration: '10:00:00'
-              }
-            }
-          ]
-        }
-      ]
-    }
-    originHostHeader: replace(replace(productimagesstgacc.properties.primaryEndpoints.blob, 'https://', ''), '/', '')
-    origins: [
-      {
-        name: replace(
-          replace(replace(productimagesstgacc.properties.primaryEndpoints.blob, 'https://', ''), '/', ''),
-          '.',
-          '-'
-        )
-        properties: {
-          hostName: replace(replace(productimagesstgacc.properties.primaryEndpoints.blob, 'https://', ''), '/', '')
-          originHostHeader: replace(
-            replace(productimagesstgacc.properties.primaryEndpoints.blob, 'https://', ''),
-            '/',
-            ''
-          )
-        }
-      }
-    ]
+    enabledState: 'Enabled'
   }
 }
 
-// endpoint (ui / old website)
-resource cdnprofile_uiendpoint 'Microsoft.Cdn/profiles/endpoints@2022-11-01-preview' = {
+// route (product images)
+resource cdnprofile_imagesroute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2021-06-01' = {
+  name: 'images-route'
+  parent: cdnprofile_imagesendpoint
+  dependsOn: [cdnprofile_imagesorigin]
+  properties: {
+    originGroup: {
+      id: cdnprofile_imagesorigingroup.id
+    }
+    supportedProtocols: ['Http', 'Https']
+    patternsToMatch: ['/*']
+    forwardingProtocol: 'HttpsOnly'
+    linkToDefaultDomain: 'Enabled'
+    httpsRedirect: 'Enabled'
+    cacheConfiguration: {
+      queryStringCachingBehavior: 'IgnoreQueryString'
+      compressionSettings: {
+        isCompressionEnabled: true
+        contentTypesToCompress: ['image/svg+xml']
+      }
+    }
+  }
+}
+
+// origin group (ui / old website)
+resource cdnprofile_uiorigingroup 'Microsoft.Cdn/profiles/originGroups@2021-06-01' = {
+  name: 'ui-origin-group'
+  parent: cdnprofile
+  properties: {
+    loadBalancingSettings: {
+      sampleSize: 4
+      successfulSamplesRequired: 3
+    }
+    healthProbeSettings: {
+      probePath: '/'
+      probeRequestType: 'HEAD'
+      probeProtocol: 'Https'
+      probeIntervalInSeconds: 100
+    }
+  }
+}
+
+// origin (ui / old website)
+resource cdnprofile_uiorigin 'Microsoft.Cdn/profiles/originGroups/origins@2021-06-01' = {
+  name: 'ui-origin'
+  parent: cdnprofile_uiorigingroup
+  properties: {
+    hostName: replace(replace(uistgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
+    httpPort: 80
+    httpsPort: 443
+    originHostHeader: replace(replace(uistgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
+    priority: 1
+    weight: 1000
+  }
+}
+
+// afd endpoint (ui / old website)
+resource cdnprofile_uiendpoint 'Microsoft.Cdn/profiles/afdEndpoints@2021-06-01' = {
   name: cdnUiEndpointName
   location: 'global'
-  tags: resourceTags
   parent: cdnprofile
   properties: {
-    isCompressionEnabled: true
-    contentTypesToCompress: [
-      'application/eot'
-      'application/font'
-      'application/font-sfnt'
-      'application/javascript'
-      'application/json'
-      'application/opentype'
-      'application/otf'
-      'application/pkcs7-mime'
-      'application/truetype'
-      'application/ttf'
-      'application/vnd.ms-fontobject'
-      'application/xhtml+xml'
-      'application/xml'
-      'application/xml+rss'
-      'application/x-font-opentype'
-      'application/x-font-truetype'
-      'application/x-font-ttf'
-      'application/x-httpd-cgi'
-      'application/x-javascript'
-      'application/x-mpegurl'
-      'application/x-opentype'
-      'application/x-otf'
-      'application/x-perl'
-      'application/x-ttf'
-      'font/eot'
-      'font/ttf'
-      'font/otf'
-      'font/opentype'
-      'image/svg+xml'
-      'text/css'
-      'text/csv'
-      'text/html'
-      'text/javascript'
-      'text/js'
-      'text/plain'
-      'text/richtext'
-      'text/tab-separated-values'
-      'text/xml'
-      'text/x-script'
-      'text/x-component'
-      'text/x-java-source'
-    ]
-    deliveryPolicy: {
-      rules: [
-        {
-          name: 'Global'
-          order: 0
-          actions: [
-            {
-              name: 'CacheExpiration'
-              parameters: {
-                typeName: 'DeliveryRuleCacheExpirationActionParameters'
-                cacheBehavior: 'SetIfMissing'
-                cacheType: 'All'
-                cacheDuration: '10:00:00'
-              }
-            }
-          ]
-        }
-      ]
-    }
-    originHostHeader: replace(replace(uistgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-    origins: [
-      {
-        name: replace(replace(replace(uistgacc.properties.primaryEndpoints.web, 'https://', ''), '/', ''), '.', '-')
-        properties: {
-          hostName: replace(replace(uistgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-          originHostHeader: replace(replace(uistgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-        }
-      }
-    ]
+    enabledState: 'Enabled'
   }
 }
 
-// endpoint (ui / new website)
-resource cdnprofile_ui2endpoint 'Microsoft.Cdn/profiles/endpoints@2022-11-01-preview' = {
-  name: cdnUi2EndpointName
-  location: 'global'
-  tags: resourceTags
+// route (ui / old website)
+resource cdnprofile_uiroute 'Microsoft.Cdn/profiles/afdEndpoints/routes@2021-06-01' = {
+  name: 'ui-route'
+  parent: cdnprofile_uiendpoint
+  dependsOn: [cdnprofile_uiorigin]
+  properties: {
+    originGroup: {
+      id: cdnprofile_uiorigingroup.id
+    }
+    supportedProtocols: ['Http', 'Https']
+    patternsToMatch: ['/*']
+    forwardingProtocol: 'HttpsOnly'
+    linkToDefaultDomain: 'Enabled'
+    httpsRedirect: 'Enabled'
+    cacheConfiguration: {
+      queryStringCachingBehavior: 'IgnoreQueryString'
+      compressionSettings: {
+        isCompressionEnabled: true
+        contentTypesToCompress: [
+          'application/eot'
+          'application/font'
+          'application/font-sfnt'
+          'application/javascript'
+          'application/json'
+          'application/opentype'
+          'application/otf'
+          'application/pkcs7-mime'
+          'application/truetype'
+          'application/ttf'
+          'application/vnd.ms-fontobject'
+          'application/xhtml+xml'
+          'application/xml'
+          'application/xml+rss'
+          'application/x-font-opentype'
+          'application/x-font-truetype'
+          'application/x-font-ttf'
+          'application/x-httpd-cgi'
+          'application/x-javascript'
+          'application/x-mpegurl'
+          'application/x-opentype'
+          'application/x-otf'
+          'application/x-perl'
+          'application/x-ttf'
+          'font/eot'
+          'font/ttf'
+          'font/otf'
+          'font/opentype'
+          'image/svg+xml'
+          'text/css'
+          'text/csv'
+          'text/html'
+          'text/javascript'
+          'text/js'
+          'text/plain'
+          'text/richtext'
+          'text/tab-separated-values'
+          'text/xml'
+          'text/x-script'
+          'text/x-component'
+          'text/x-java-source'
+        ]
+      }
+    }
+  }
+}
+
+// origin group (ui / new website)
+resource cdnprofile_ui2origingroup 'Microsoft.Cdn/profiles/originGroups@2021-06-01' = {
+  name: 'ui2-origin-group'
   parent: cdnprofile
   properties: {
-    isCompressionEnabled: true
-    contentTypesToCompress: [
-      'application/eot'
-      'application/font'
-      'application/font-sfnt'
-      'application/javascript'
-      'application/json'
-      'application/opentype'
-      'application/otf'
-      'application/pkcs7-mime'
-      'application/truetype'
-      'application/ttf'
-      'application/vnd.ms-fontobject'
-      'application/xhtml+xml'
-      'application/xml'
-      'application/xml+rss'
-      'application/x-font-opentype'
-      'application/x-font-truetype'
-      'application/x-font-ttf'
-      'application/x-httpd-cgi'
-      'application/x-javascript'
-      'application/x-mpegurl'
-      'application/x-opentype'
-      'application/x-otf'
-      'application/x-perl'
-      'application/x-ttf'
-      'font/eot'
-      'font/ttf'
-      'font/otf'
-      'font/opentype'
-      'image/svg+xml'
-      'text/css'
-      'text/csv'
-      'text/html'
-      'text/javascript'
-      'text/js'
-      'text/plain'
-      'text/richtext'
-      'text/tab-separated-values'
-      'text/xml'
-      'text/x-script'
-      'text/x-component'
-      'text/x-java-source'
-    ]
-    deliveryPolicy: {
-      rules: [
-        {
-          name: 'Global'
-          order: 0
-          actions: [
-            {
-              name: 'CacheExpiration'
-              parameters: {
-                typeName: 'DeliveryRuleCacheExpirationActionParameters'
-                cacheBehavior: 'SetIfMissing'
-                cacheType: 'All'
-                cacheDuration: '02:00:00'
-              }
-            }
-          ]
-        }
-        {
-          name: 'EnforceHttps'
-          order: 1
-          conditions: [
-            {
-              name: 'RequestScheme'
-              parameters: {
-                typeName: 'DeliveryRuleRequestSchemeConditionParameters'
-                matchValues: [
-                  'HTTP'
-                ]
-                operator: 'Equal'
-                negateCondition: false
-                transforms: []
-              }
-            }
-          ]
-          actions: [
-            {
-              name: 'UrlRedirect'
-              parameters: {
-                typeName: 'DeliveryRuleUrlRedirectActionParameters'
-                redirectType: 'Found'
-                destinationProtocol: 'Https'
-              }
-            }
-          ]
-        }
-      ]
+    loadBalancingSettings: {
+      sampleSize: 4
+      successfulSamplesRequired: 3
     }
+    healthProbeSettings: {
+      probePath: '/'
+      probeRequestType: 'HEAD'
+      probeProtocol: 'Https'
+      probeIntervalInSeconds: 100
+    }
+  }
+}
+
+// origin (ui / new website)
+resource cdnprofile_ui2origin 'Microsoft.Cdn/profiles/originGroups/origins@2021-06-01' = {
+  name: 'ui2-origin'
+  parent: cdnprofile_ui2origingroup
+  properties: {
+    hostName: replace(replace(ui2stgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
+    httpPort: 80
+    httpsPort: 443
     originHostHeader: replace(replace(ui2stgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-    origins: [
-      {
-        name: replace(replace(replace(ui2stgacc.properties.primaryEndpoints.web, 'https://', ''), '/', ''), '.', '-')
-        properties: {
-          hostName: replace(replace(ui2stgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-          originHostHeader: replace(replace(ui2stgacc.properties.primaryEndpoints.web, 'https://', ''), '/', '')
-        }
+    priority: 1
+    weight: 1000
+  }
+}
+
+// afd endpoint (ui / new website)
+resource cdnprofile_ui2endpoint 'Microsoft.Cdn/profiles/afdEndpoints@2021-06-01' = {
+  name: cdnUi2EndpointName
+  location: 'global'
+  parent: cdnprofile
+  properties: {
+    enabledState: 'Enabled'
+  }
+}
+
+// route (ui / new website)
+resource cdnprofile_ui2route 'Microsoft.Cdn/profiles/afdEndpoints/routes@2021-06-01' = {
+  name: 'ui2-route'
+  parent: cdnprofile_ui2endpoint
+  dependsOn: [cdnprofile_ui2origin]
+  properties: {
+    originGroup: {
+      id: cdnprofile_ui2origingroup.id
+    }
+    supportedProtocols: ['Http', 'Https']
+    patternsToMatch: ['/*']
+    forwardingProtocol: 'HttpsOnly'
+    linkToDefaultDomain: 'Enabled'
+    httpsRedirect: 'Enabled'
+    cacheConfiguration: {
+      queryStringCachingBehavior: 'IgnoreQueryString'
+      compressionSettings: {
+        isCompressionEnabled: true
+        contentTypesToCompress: [
+          'application/eot'
+          'application/font'
+          'application/font-sfnt'
+          'application/javascript'
+          'application/json'
+          'application/opentype'
+          'application/otf'
+          'application/pkcs7-mime'
+          'application/truetype'
+          'application/ttf'
+          'application/vnd.ms-fontobject'
+          'application/xhtml+xml'
+          'application/xml'
+          'application/xml+rss'
+          'application/x-font-opentype'
+          'application/x-font-truetype'
+          'application/x-font-ttf'
+          'application/x-httpd-cgi'
+          'application/x-javascript'
+          'application/x-mpegurl'
+          'application/x-opentype'
+          'application/x-otf'
+          'application/x-perl'
+          'application/x-ttf'
+          'font/eot'
+          'font/ttf'
+          'font/otf'
+          'font/opentype'
+          'image/svg+xml'
+          'text/css'
+          'text/csv'
+          'text/html'
+          'text/javascript'
+          'text/js'
+          'text/plain'
+          'text/richtext'
+          'text/tab-separated-values'
+          'text/xml'
+          'text/x-script'
+          'text/x-component'
+          'text/x-java-source'
+        ]
       }
-    ]
+    }
   }
 }
 
@@ -1328,7 +1365,7 @@ resource dashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
 // aks cluster
 //
 
-resource aks 'Microsoft.ContainerService/managedClusters@2022-10-02-preview' = {
+resource aks 'Microsoft.ContainerService/managedClusters@2023-01-01' = {
   name: aksClusterName
   location: resourceLocation
   tags: resourceTags
