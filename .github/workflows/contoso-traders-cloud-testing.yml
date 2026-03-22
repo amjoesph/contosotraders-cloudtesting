@@ -186,7 +186,7 @@ jobs:
       - name: purge product images cdn endpoint
         uses: azure/CLI@v1
         with:
-          inlineScript: az afd endpoint purge --no-wait --content-paths '/*' -n '${{ env.PRODUCTS_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
+          inlineScript: az afd endpoint purge --no-wait --content-paths '/*' --endpoint-name '${{ env.PRODUCTS_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
       - name: extract acr password
         uses: azure/CLI@v1
         id: extract-acr-password
@@ -287,7 +287,7 @@ jobs:
       - name: purge ui cdn endpoint
         uses: azure/CLI@v1
         with:
-          inlineScript: az afd endpoint purge --no-wait --content-paths '/*' -n '${{ env.UI_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
+          inlineScript: az afd endpoint purge --no-wait --content-paths '/*' --endpoint-name '${{ env.UI_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
       - name: get ui cdn endpoint
         uses: azure/CLI@v1
         id: get-uiCdnEndpoint
