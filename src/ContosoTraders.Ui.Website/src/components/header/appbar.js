@@ -357,8 +357,8 @@ function TopAppBar(props) {
             </IconButton> */}
           </div> :
             // null
-            process.env.REACT_APP_B2CCLIENTID && <>
-              <Button className='iconButton' aria-label="show 4 new mails" color="inherit" onClick={() => onClickLogIn()} >
+            <>
+              <Button className='iconButton' color="inherit" onClick={() => history('/login')}>
                 Login
               </Button></>
           }

@@ -22,6 +22,7 @@ import {
   AboutUs,
   ErrorPage,
   Cart,
+  SignInSignUp,
 } from "./pages";
 
 // import "./i18n";
@@ -101,6 +102,7 @@ import { getCartQuantity } from "./actions/actions";
             <Route path="/profile/:page" element={<Profile/>} />
             </>:null}
             <Route path="/cart" element={<Cart/>}/>
+            <Route path="/login" element={<SignInSignUp/>}/>
             {/* <PrivateRoute
               path="/shopping-cart"
               element={ShoppingCart}

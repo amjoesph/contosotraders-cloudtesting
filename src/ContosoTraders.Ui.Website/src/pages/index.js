@@ -11,6 +11,7 @@ import TermsOfService from './legals/termsOfService';
 import AboutUs from './legals/aboutUs';
 import ErrorPage from './error/errorPage';
 import Cart from './cart/cart';
+import SignInSignUp from './auth/SignInSignUp';
 export {
     Home,
     Arrivals,
@@ -25,4 +26,5 @@ export {
     AboutUs,
     ErrorPage,
     Cart,
+    SignInSignUp,
 };
