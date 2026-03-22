@@ -178,11 +178,11 @@ jobs:
       - name: seed product image (product details)
         uses: azure/CLI@v1
         with:
-          inlineScript: az storage blob upload-batch --auth-mode login --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '${{ env.PRODUCT_DETAILS_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-details' --overwrite
+          inlineScript: az storage blob upload-batch --auth-mode key --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '${{ env.PRODUCT_DETAILS_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-details' --overwrite
       - name: seed product image (product list)
         uses: azure/CLI@v1
         with:
-          inlineScript: az storage blob upload-batch --auth-mode login --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '${{ env.PRODUCT_LIST_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-list' --overwrite
+          inlineScript: az storage blob upload-batch --auth-mode key --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '${{ env.PRODUCT_LIST_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-list' --overwrite
       - name: purge product images cdn endpoint
         uses: azure/CLI@v1
         with:
@@ -283,7 +283,7 @@ jobs:
       - name: deploy ui to storage
         uses: azure/CLI@v1
         with:
-          inlineScript: az storage blob upload-batch --auth-mode login --account-name '${{ env.UI_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '$web' -s 'src/ContosoTraders.Ui.Website/build' --overwrite
+          inlineScript: az storage blob upload-batch --auth-mode key --account-name '${{ env.UI_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '$web' -s 'src/ContosoTraders.Ui.Website/build' --overwrite
       - name: purge ui cdn endpoint
         uses: azure/CLI@v1
         with:
