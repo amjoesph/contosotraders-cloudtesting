@@ -178,15 +178,15 @@ jobs:
       - name: seed product image (product details)
         uses: azure/CLI@v1
         with:
-          inlineScript: az storage blob sync --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -c '${{ env.PRODUCT_DETAILS_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-details'
+          inlineScript: az storage blob upload-batch --auth-mode login --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '${{ env.PRODUCT_DETAILS_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-details' --overwrite
       - name: seed product image (product list)
         uses: azure/CLI@v1
         with:
-          inlineScript: az storage blob sync --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -c '${{ env.PRODUCT_LIST_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-list'
+          inlineScript: az storage blob upload-batch --auth-mode login --account-name '${{ env.PRODUCT_IMAGES_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '${{ env.PRODUCT_LIST_CONTAINER_NAME }}' -s 'src/ContosoTraders.Api.Images/product-list' --overwrite
       - name: purge product images cdn endpoint
         uses: azure/CLI@v1
         with:
-          inlineScript: az cdn endpoint purge --no-wait --content-paths '/*' -n '${{ env.PRODUCTS_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
+          inlineScript: az afd endpoint purge --no-wait --content-paths '/*' -n '${{ env.PRODUCTS_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
       - name: extract acr password
         uses: azure/CLI@v1
         id: extract-acr-password
@@ -283,11 +283,11 @@ jobs:
       - name: deploy ui to storage
         uses: azure/CLI@v1
         with:
-          inlineScript: az storage blob sync --account-name '${{ env.UI_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -c '$web' -s 'src/ContosoTraders.Ui.Website/build'
+          inlineScript: az storage blob upload-batch --auth-mode login --account-name '${{ env.UI_STORAGE_ACCOUNT_NAME }}${{ vars.SUFFIX }}' -d '$web' -s 'src/ContosoTraders.Ui.Website/build' --overwrite
       - name: purge ui cdn endpoint
         uses: azure/CLI@v1
         with:
-          inlineScript: az cdn endpoint purge --no-wait --content-paths '/*' -n '${{ env.UI_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
+          inlineScript: az afd endpoint purge --no-wait --content-paths '/*' -n '${{ env.UI_CDN_ENDPOINT_NAME }}${{ vars.SUFFIX }}' -g '${{ env.RESOURCE_GROUP_NAME }}${{ vars.SUFFIX }}' --profile-name '${{ env.CDN_PROFILE_NAME }}${{ vars.SUFFIX }}'
       - name: get ui cdn endpoint
         uses: azure/CLI@v1
         id: get-uiCdnEndpoint
