@@ -136,17 +136,6 @@ function TopAppBar(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onClickLogIn = async () => {
-    let user = await authService.login();
-    if (user) {
-      user['loggedIn'] = true;
-      user['isB2c'] = true;
-      user['token'] = sessionStorage.getItem('msal.idtoken');
-      localStorage.setItem('state', JSON.stringify(user))
-      props.submitAction(user);
-      window.location.reload()
-    }
-  }
   const onClickLogout = () => {
     localStorage.clear();
 
