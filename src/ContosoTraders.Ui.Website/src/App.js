@@ -5,6 +5,7 @@ import { connect } from "react-redux";
 // import Meeting from './pages/home/components/videoCall/Meeting';
 
 import Header from "./components/header/header";
+import CookieBanner from "./components/cookieBanner/CookieBanner";
 import HeaderMessage from "./components/header/headerMessage";
 import Appbar from "./components/header/appbar";
 import Footer from "./components/footer/footer";
@@ -112,6 +113,7 @@ import { getCartQuantity } from "./actions/actions";
             <Route path="*" element={<ErrorPage/>} />
           </Routes>
           <Footer />
+          <CookieBanner />
         </Fragment>
       </div>
     );
