@@ -12,6 +12,7 @@ import AboutUs from './legals/aboutUs';
 import ErrorPage from './error/errorPage';
 import Cart from './cart/cart';
 import SignInSignUp from './auth/SignInSignUp';
+import FeedbackForm from './feedback/FeedbackForm';
 export {
     Home,
     Arrivals,
@@ -27,4 +28,5 @@ export {
     ErrorPage,
     Cart,
     SignInSignUp,
+    FeedbackForm,
 };

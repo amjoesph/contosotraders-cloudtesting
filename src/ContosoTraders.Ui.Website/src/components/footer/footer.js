@@ -66,6 +66,7 @@ const Footer = () => {
                         <li className='list-element'><Link to='/terms-of-service'>Terms of Service</Link></li>
                         <li className='list-element'><Link to='/refund-policy'>Refund Policy</Link></li>
                         <li className='list-element'><Link to='/about-us'>About Us</Link></li>
+                        <li className='list-element'><Link to='/feedback'>Feedback &amp; Support</Link></li>
                     </ul>
                 </Grid>
                 <Grid item lg={4} md={6} xs={12} className='section-4'>
